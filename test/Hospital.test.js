@@ -2,7 +2,7 @@ const { expect } = require('chai');
 const { ethers } = require('hardhat');
 const { TASK_COMPILE_SOLIDITY_LOG_RUN_COMPILER_START } = require('hardhat/builtin-tasks/task-names');
 
-describe("HospitalManagmentSystem", () => {
+describe.only("HospitalManagmentSystem", () => {
     let contract, Contract, owner, doctor, user;
 
     beforeEach(async () => {
@@ -72,7 +72,37 @@ describe("HospitalManagmentSystem", () => {
             console.log(amount2Pay.amountToPay)
             const patientCallsPayFunction = await contract.connect(hash, user.address, { value: amount2Pay.amountToPay });
             expect(patientCallsPayFunction).to.not.be.reverted;
-            
         })
+    })
+    describe('Doctors functions', () => {
+        let contract, Contract, owner, doctor, user;
+        let tokenContract, TokenContract;
+        const sendEther = ethers.utils.parseEther('1')
+
+        beforeEach(async () => {
+            Contract = await ethers.getContractFactory('HospitalManagment');
+            contract = await Contract.deploy();
+            await contract.deployed();
+
+            TokenContract = await ethers.getContractFactory('HospitalToken');
+            tokenContract = await TokenContract.deploy(100000);
+            await tokenContract.deployed();
+
+            [owner, doctor, user] = await ethers.getSigners();
+
+            await contract.setRole(doctor.address);
+        })
+        it("Should allow the owner to transfer tokens to the doctors and allow them to withdraw", async () => {
+            await contract.salary(contract.address, 10000, { value: sendEther });
+            const contractBalance = await contract.getContractBalance();
+            expect(contractBalance).to.be.equal("1000000000000000000");
+
+            await contract.connect(doctor).withdrawBalance(5000);
+            const doctorsBalance = await ethers.provider.getBalance(doctor.address);
+            console.log(doctorsBalance);
+
+            //User tries to withdraw
+            expect(contract.connect(user).withdrawBalance(3000)).to.be.reverted;
+        });
     })
 })

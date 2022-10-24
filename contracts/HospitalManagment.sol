@@ -20,7 +20,24 @@ contract HospitalManagment is AccessControl{
         require(msg.sender == owner, "Only owner have access");
         _;
     }
-
+    //Events
+    event SetupRole(
+        address indexed _boss,
+        address indexed _newRole
+    );
+    event PayedTaxes(
+        address sender,
+        uint amount
+    );
+    event Salaries(
+        address indexed receiver,
+        uint amount
+    );
+    event Tip(
+        address indexed to,
+        uint _amount
+    );
+    //Structs
     struct Doctor {
         uint id;
         address doctor_address;
@@ -40,10 +57,15 @@ contract HospitalManagment is AccessControl{
     } 
     mapping(address => Doctor) public doctor;
     mapping(address => Patient) public patient;
+    mapping(address => uint256) public receivedTokens;
+    mapping(address => uint256) public givenTips;
+
+
     RegisteredDiagnostics[] rDiagnostic;
 
     function setRole(address _newDoctor) public onlyOwner {
         _setupRole(DOCTOR_ROLE, _newDoctor);
+        emit SetupRole(msg.sender, _newDoctor);
     }
     function transferOwnership(address _newOwner) external onlyOwner {
         require(_newOwner != owner, "You are already the owner");
@@ -77,10 +99,34 @@ contract HospitalManagment is AccessControl{
 
         uint tax = patient[_patientAddress].amountToPay + msg.value;  
         payable(address(this)).transfer(tax);
+        emit PayedTaxes(msg.sender, tax);
+    }
+    function salary(address _to, uint256 _tokens) public payable onlyRole(OWNER_ROLE){
+        require(_to != address(0), "Cannot send ether to address 0");
+
+        payable(address(this)).transfer(_tokens);
+    }
+    function withdrawBalance(uint256 _amount) public onlyRole(DOCTOR_ROLE) {
+        require(address(this).balance > 0, "Address's balance is 0");
+        require(_amount > 0, "You should withdraw at least 1 token");
+        require(_amount <= 10000, "Your salary is 10000 HT tokens");
+
+        payable(msg.sender).transfer(_amount);
+    }
+    function giveTip(address _to, uint _amount) public payable {
+        require(_to != address(0));
+        require(_amount > 0);
+        
+        payable(_to).transfer(_amount);
+        givenTips[_to] = _amount + msg.value;
+        emit Tip(_to, _amount);
     }
 
     function isAccountHasARole(bytes32 _role, address _acc) public view returns(bool) {
         return hasRole(_role, _acc);
+    }
+    function checkYourBalance() public view onlyRole(DOCTOR_ROLE) returns(uint256){
+        return receivedTokens[msg.sender];
     }
     function getContractBalance() public view returns(uint){
         return address(this).balance;
